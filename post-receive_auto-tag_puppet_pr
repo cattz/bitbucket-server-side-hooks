@@ -13,7 +13,6 @@ source ${DIR}/utils.sh
 
 LOGLEVEL=${2:-DEBUG}
 
-env >> debug_env.txt
 
 target_branch=${1:-master}
 pull_request_regex="Merge pull request #([0-9]+) in ([^\/]+)\/([^ ]+) from ([^ ]+) to ${target_branch}"
