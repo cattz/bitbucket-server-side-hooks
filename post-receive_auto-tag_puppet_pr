@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# Hook type: Git server side, post-receive
+# Auto tag on merging PRs to the target branch ${1}
+# This is intended ot be used in puppet modules since the tag name
+# is taken from the file metadata.json
+
+
+set -e
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source ${DIR}/utils.sh 
+
+LOGLEVEL=${2:-DEBUG}
+
+env >> debug_env.txt
+
+target_branch=${1:-master}
+pull_request_regex="Merge pull request #([0-9]+) in ([^\/]+)\/([^ ]+) from ([^ ]+) to ${target_branch}"
+
+while read oldrev newrev refname
+do
+    branch=$(git rev-parse --symbolic --abbrev-ref $refname)
+    if [ -n "$branch" ] && [ "$target_branch" == "$branch" ]; then
+       commit_message="$(git log --format=%B -n 1 ${newrev})"
+       if [[ ${commit_message} =~ ${pull_request_regex} ]]; then
+          pr_number=${BASH_REMATCH[1]}
+          project=${BASH_REMATCH[2]}
+          repo_slug=${BASH_REMATCH[3]}
+          from_branch=${BASH_REMATCH[4]}
+          LOG_FILE="${project}_${repo_slug}_post-receive.log"
+          log_debug ${LOG_FILE} "Creating tag for PR: ${pr_number} to ${target_branch} from branch ${from_branch}"
+          branch_version=$(basename ${from_branch})
+          metadata_version=$(git show ${newrev}:metadata.json | grep version | cut -d'"' -f4)
+          log_debug ${LOG_FILE} "Branch: ${branch_version}, metadata: ${metadata_version}"
+          git tag -a "${metadata_version}" -m"Automated tag for version ${metadata_version}" ${target_branch}
+          log_info ${LOG_FILE} "Automated tag for version ${metadata_version}"
+       fi
+     fi
+done
